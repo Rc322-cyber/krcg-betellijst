@@ -21,6 +21,13 @@
   margin-bottom: 24px;
 }
 
+.header-actions {
+  display: flex;
+  gap: 12px;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+}
+
 .eyebrow {
   margin: 0 0 8px;
   font-size: 0.82rem;
@@ -71,7 +78,8 @@
   color: #0f172a;
 }
 
-.tabs-row {
+.tabs-row,
+.status-filter-row {
   display: flex;
   gap: 12px;
   margin-bottom: 24px;
@@ -472,6 +480,66 @@
   font-weight: 600;
 }
 
+.print-sheet {
+  display: none;
+}
+
+.print-header {
+  margin-bottom: 24px;
+}
+
+.print-header p {
+  margin: 8px 0 0;
+  color: #475569;
+}
+
+.print-list {
+  display: grid;
+  gap: 16px;
+}
+
+.print-person-card {
+  border: 1px solid #dbe4ee;
+  border-radius: 16px;
+  padding: 18px;
+  break-inside: avoid;
+}
+
+.print-person-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 16px;
+}
+
+.print-person-row + .print-person-row {
+  margin-top: 12px;
+}
+
+.print-label {
+  min-width: 160px;
+  font-weight: 700;
+  color: #475569;
+}
+
+.print-order-list {
+  display: grid;
+  gap: 6px;
+  text-align: right;
+}
+
+.print-totals-grid {
+  display: grid;
+  gap: 10px;
+  margin-top: 18px;
+  padding-top: 16px;
+  border-top: 1px solid #e2e8f0;
+}
+
+.print-empty {
+  margin: 0;
+}
+
 @media (max-width: 900px) {
   .page-card {
     padding: 24px;
@@ -486,7 +554,9 @@
     align-items: stretch;
   }
 
-  .tabs-row {
+  .header-actions,
+  .tabs-row,
+  .status-filter-row {
     flex-wrap: wrap;
   }
 
@@ -540,7 +610,9 @@
 
   .pickup-status,
   .mode-button,
-  .tab-button {
+  .tab-button,
+  .header-actions .primary-button,
+  .header-actions .secondary-button {
     width: 100%;
     justify-content: center;
   }
@@ -554,7 +626,68 @@
     width: 100%;
   }
 
-  .person-header {
+  .person-header,
+  .print-person-row {
     grid-template-columns: 1fr;
+    flex-direction: column;
+  }
+
+  .print-order-list {
+    text-align: left;
+  }
+}
+
+@media print {
+  :root,
+  html,
+  body {
+    background: #ffffff;
+  }
+
+  body {
+    margin: 0;
+  }
+
+  .app-shell {
+    min-height: auto;
+    padding: 0;
+  }
+
+  .page-card {
+    max-width: none;
+    margin: 0;
+    padding: 0;
+    border: 0;
+    border-radius: 0;
+    box-shadow: none;
+    background: transparent;
+  }
+
+  .page-header,
+  .summary-card,
+  .status-filter-row,
+  .search-row,
+  .people-list {
+    display: none !important;
+  }
+
+  .print-sheet {
+    display: block;
+  }
+
+  .print-header h1 {
+    margin-bottom: 4px;
+    font-size: 24px;
+  }
+
+  .print-person-card {
+    border: 1px solid #cbd5e1;
+    border-radius: 0;
+    padding: 14px 0;
+    page-break-inside: avoid;
+  }
+
+  .print-person-card + .print-person-card {
+    border-top: 0;
   }
 }

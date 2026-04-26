@@ -79,8 +79,8 @@ const loadStoredPeople = () => {
 function AppTabs() {
   const [people, setPeople] = useState(loadStoredPeople)
   const [searchTerm, setSearchTerm] = useState('')
-  const [pickupMode, setPickupMode] = useState(false)
   const [activeTab, setActiveTab] = useState('bestellingen')
+  const [statusFilter, setStatusFilter] = useState('openstaand')
 
   const applyPeopleUpdate = (updater) => {
     setPeople((currentPeople) => {
@@ -181,6 +181,16 @@ function AppTabs() {
   const getOutstandingAmount = (person) =>
     Math.max(getPersonTotal(person) - getPaidAmount(person), 0)
 
+  const summarizeItems = (items) =>
+    items
+      .filter((item) => item.name.trim() && parseNumber(item.quantity) > 0)
+      .map((item) => {
+        const quantity = parseNumber(item.quantity)
+        const size = item.size.trim()
+
+        return `${quantity}x ${item.name.trim()}${size ? ` (${size})` : ''} - ${formatCurrency(getItemTotal(item))}`
+      })
+
   const allPeopleTotal = people.reduce(
     (total, person) => total + getPersonTotal(person),
     0,
@@ -198,11 +208,22 @@ function AppTabs() {
 
   const normalizedSearchTerm = searchTerm.trim().toLowerCase()
 
+  const matchesStatusFilter = (person) => {
+    if (statusFilter === 'afgehaald') {
+      return person.pickedUp
+    }
+
+    if (statusFilter === 'openstaand') {
+      return !person.pickedUp
+    }
+
+    return true
+  }
+
   const filteredPeople = people.filter((person) => {
     const matchesSearch = person.name.toLowerCase().includes(normalizedSearchTerm)
-    const matchesPickupMode = !pickupMode || !person.pickedUp
 
-    return matchesSearch && matchesPickupMode
+    return matchesSearch && matchesStatusFilter(person)
   })
 
   const orderSummaryMap = people.reduce((summary, person) => {
@@ -247,6 +268,13 @@ function AppTabs() {
       left.product.localeCompare(right.product, 'nl-BE', { numeric: true }),
     )
 
+  const handlePrint = () => {
+    window.print()
+  }
+
+  const statusFilterLabel =
+    statusFilter.charAt(0).toUpperCase() + statusFilter.slice(1)
+
   return (
     <main className="app-shell">
       <section className="page-card">
@@ -255,26 +283,38 @@ function AppTabs() {
             <p className="eyebrow">Genkies Casuals Bestel App</p>
             <h1>Genkies Casuals Bestel App</h1>
             <p className="intro">
-              Beheer bestellingen, personen en totalen op één plek
+              Beheer bestellingen, personen en totalen op een plek.
             </p>
           </div>
-          {activeTab === 'bestellingen' ? (
-            <button
-              type="button"
-              className="primary-button"
-              onClick={addPerson}
-            >
-              Persoon toevoegen
-            </button>
-          ) : (
-            <button
-              type="button"
-              className="primary-button"
-              onClick={() => window.print()}
-            >
-              Printen
-            </button>
-          )}
+
+          <div className="header-actions">
+            {activeTab === 'bestellingen' ? (
+              <>
+                <button
+                  type="button"
+                  className="secondary-button"
+                  onClick={handlePrint}
+                >
+                  Bestellijst afdrukken
+                </button>
+                <button
+                  type="button"
+                  className="primary-button"
+                  onClick={addPerson}
+                >
+                  Persoon toevoegen
+                </button>
+              </>
+            ) : (
+              <button
+                type="button"
+                className="primary-button"
+                onClick={handlePrint}
+              >
+                Printen
+              </button>
+            )}
+          </div>
         </div>
 
         <div className="tabs-row">
@@ -315,41 +355,46 @@ function AppTabs() {
               </div>
             </div>
 
-            <div className="controls-row">
-              <div
-                className={`pickup-status ${
-                  pickupMode ? 'pickup-status-active' : ''
-                }`}
-              >
-                Afhaalmodus {pickupMode ? 'AAN' : 'UIT'}
-              </div>
+            <div className="status-filter-row">
               <button
                 type="button"
-                className={`mode-button ${
-                  pickupMode ? 'mode-button-active' : ''
+                className={`tab-button ${
+                  statusFilter === 'openstaand' ? 'tab-button-active' : ''
                 }`}
-                onClick={() => setPickupMode((currentValue) => !currentValue)}
+                onClick={() => setStatusFilter('openstaand')}
               >
-                Afhaalmodus
+                Openstaand
+              </button>
+              <button
+                type="button"
+                className={`tab-button ${
+                  statusFilter === 'afgehaald' ? 'tab-button-active' : ''
+                }`}
+                onClick={() => setStatusFilter('afgehaald')}
+              >
+                Afgehaald
+              </button>
+              <button
+                type="button"
+                className={`tab-button ${
+                  statusFilter === 'alles' ? 'tab-button-active' : ''
+                }`}
+                onClick={() => setStatusFilter('alles')}
+              >
+                Alles
               </button>
             </div>
 
-            <div className={`search-row ${pickupMode ? 'search-row-pickup' : ''}`}>
+            <div className="search-row">
               <label className="field search-field">
                 <span>Zoeken</span>
                 <input
                   type="text"
                   placeholder="Zoek naam..."
                   value={searchTerm}
-                  autoFocus={pickupMode}
                   onChange={(event) => setSearchTerm(event.target.value)}
                 />
               </label>
-              {pickupMode ? (
-                <p className="pickup-hint">
-                  Alleen personen die nog niet afgehaald zijn worden getoond.
-                </p>
-              ) : null}
             </div>
 
             <div className="people-list">
@@ -366,7 +411,7 @@ function AppTabs() {
                       key={person.id}
                       className={`person-card ${
                         person.pickedUp ? 'is-picked-up' : ''
-                      } ${pickupMode ? 'person-card-pickup-mode' : ''}`}
+                      }`}
                     >
                       <div className="person-header">
                         <div className="person-index">
@@ -425,7 +470,7 @@ function AppTabs() {
                           type="button"
                           className={`toggle-button ${
                             person.pickedUp ? 'toggle-active' : ''
-                          } ${pickupMode ? 'toggle-button-pickup-mode' : ''}`}
+                          }`}
                           onClick={() =>
                             updatePersonField(
                               person.id,
@@ -434,9 +479,7 @@ function AppTabs() {
                             )
                           }
                         >
-                          {person.pickedUp
-                            ? 'Afgehaald ✅'
-                            : 'Nog niet afgehaald ❌'}
+                          {person.pickedUp ? 'Afgehaald ja' : 'Afgehaald nee'}
                         </button>
 
                         <button
@@ -618,6 +661,67 @@ function AppTabs() {
             )}
           </section>
         )}
+
+        <section className="print-sheet" aria-hidden="true">
+          <div className="print-header">
+            <h1>Bestellijst</h1>
+            <p>Filter: {statusFilterLabel}</p>
+          </div>
+
+          {filteredPeople.length === 0 ? (
+            <p className="print-empty">Geen personen om af te drukken.</p>
+          ) : (
+            <div className="print-list">
+              {filteredPeople.map((person) => {
+                const personTotal = getPersonTotal(person)
+                const paidAmount = getPaidAmount(person)
+                const outstandingAmount = getOutstandingAmount(person)
+                const itemSummary = summarizeItems(person.items)
+
+                return (
+                  <article key={`print-${person.id}`} className="print-person-card">
+                    <div className="print-person-row">
+                      <span className="print-label">Naam</span>
+                      <strong>{person.name.trim() || 'Onbekend'}</strong>
+                    </div>
+
+                    <div className="print-person-row">
+                      <span className="print-label">Bestelling</span>
+                      <div className="print-order-list">
+                        {itemSummary.length === 0 ? (
+                          <span>Geen bestelling</span>
+                        ) : (
+                          itemSummary.map((summaryLine, index) => (
+                            <span key={`${person.id}-${index}`}>{summaryLine}</span>
+                          ))
+                        )}
+                      </div>
+                    </div>
+
+                    <div className="print-totals-grid">
+                      <div className="print-person-row">
+                        <span className="print-label">Totaal te betalen</span>
+                        <strong>{formatCurrency(personTotal)}</strong>
+                      </div>
+                      <div className="print-person-row">
+                        <span className="print-label">Betaald bedrag</span>
+                        <strong>{formatCurrency(paidAmount)}</strong>
+                      </div>
+                      <div className="print-person-row">
+                        <span className="print-label">Openstaand bedrag</span>
+                        <strong>{formatCurrency(outstandingAmount)}</strong>
+                      </div>
+                      <div className="print-person-row">
+                        <span className="print-label">Status afgehaald</span>
+                        <strong>{person.pickedUp ? 'Ja' : 'Nee'}</strong>
+                      </div>
+                    </div>
+                  </article>
+                )
+              })}
+            </div>
+          )}
+        </section>
       </section>
     </main>
   )
