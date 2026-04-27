@@ -49,6 +49,14 @@
   color: #475569;
 }
 
+.sync-status-saving {
+  color: #0f172a;
+}
+
+.sync-status-error {
+  color: #b42318;
+}
+
 .summary-card {
   display: flex;
   justify-content: space-between;

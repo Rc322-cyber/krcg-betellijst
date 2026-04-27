@@ -1,7 +1,15 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
+import {
+  doc,
+  onSnapshot,
+  serverTimestamp,
+  setDoc,
+} from 'firebase/firestore'
 import './App.css'
+import { db, isFirebaseConfigured } from './firebase.js'
 
-const STORAGE_KEY = 'krcg-bestellijst'
+const COLLECTION_NAME = 'krcg'
+const DOCUMENT_NAME = 'bestellijst'
 
 const createItem = (overrides = {}) => ({
   id: crypto.randomUUID(),
@@ -62,24 +70,23 @@ const normalizePeople = (people) =>
     ? people.map(normalizePerson)
     : [createPerson()]
 
-const loadStoredPeople = () => {
-  try {
-    const storedValue = window.localStorage.getItem(STORAGE_KEY)
-
-    if (!storedValue) {
-      return normalizePeople([])
-    }
-
-    return normalizePeople(JSON.parse(storedValue))
-  } catch {
-    return normalizePeople([])
-  }
-}
-
 function App() {
-  const [people, setPeople] = useState(loadStoredPeople)
+  const [people, setPeople] = useState(() => normalizePeople([]))
   const [searchTerm, setSearchTerm] = useState('')
   const [statusFilter, setStatusFilter] = useState('openstaand')
+  const [syncStatus, setSyncStatus] = useState(
+    isFirebaseConfigured ? 'Laden...' : 'Firebase instellen',
+  )
+  const [firestoreError, setFirestoreError] = useState(
+    isFirebaseConfigured
+      ? ''
+      : 'Firebase is niet volledig ingesteld. Controleer je .env-bestand.',
+  )
+  const listDocRef = useRef(
+    isFirebaseConfigured ? doc(db, COLLECTION_NAME, DOCUMENT_NAME) : null,
+  )
+  const hasLoadedRemoteRef = useRef(false)
+  const lastSyncedPeopleJsonRef = useRef('')
 
   const applyPeopleUpdate = (updater) => {
     setPeople((currentPeople) => {
@@ -91,11 +98,100 @@ function App() {
   }
 
   useEffect(() => {
-    try {
-      window.localStorage.setItem(STORAGE_KEY, JSON.stringify(people))
-    } catch {
-      // Als localStorage niet beschikbaar is, blijft de app werken in state.
+    if (!isFirebaseConfigured || !listDocRef.current) {
+      setSyncStatus('Firebase instellen')
+      return undefined
     }
+
+    const unsubscribe = onSnapshot(
+      listDocRef.current,
+      { includeMetadataChanges: true },
+      async (snapshot) => {
+        try {
+          const remotePeople = snapshot.data()?.people
+
+          if (!snapshot.exists() || !Array.isArray(remotePeople) || remotePeople.length === 0) {
+            const initialPeople = normalizePeople([])
+
+            await setDoc(
+              listDocRef.current,
+              {
+                people: initialPeople,
+                updatedAt: serverTimestamp(),
+              },
+              { merge: true },
+            )
+            return
+          }
+
+          const nextPeople = normalizePeople(remotePeople)
+
+          hasLoadedRemoteRef.current = true
+          lastSyncedPeopleJsonRef.current = JSON.stringify(nextPeople)
+          setPeople(nextPeople)
+          setFirestoreError('')
+          setSyncStatus(
+            snapshot.metadata.hasPendingWrites ? 'Opslaan...' : 'Online gedeeld',
+          )
+        } catch (error) {
+          hasLoadedRemoteRef.current = true
+          setSyncStatus('Lezen mislukt')
+          setFirestoreError(
+            error instanceof Error
+              ? `Firestore lezen mislukt: ${error.message}`
+              : 'Firestore lezen mislukt.',
+          )
+        }
+      },
+      (error) => {
+        hasLoadedRemoteRef.current = true
+        setSyncStatus('Lezen mislukt')
+        setFirestoreError(
+          error instanceof Error
+            ? `Firestore lezen mislukt: ${error.message}`
+            : 'Firestore lezen mislukt.',
+        )
+      },
+    )
+
+    return unsubscribe
+  }, [])
+
+  useEffect(() => {
+    if (
+      !isFirebaseConfigured ||
+      !listDocRef.current ||
+      !hasLoadedRemoteRef.current
+    ) {
+      return
+    }
+
+    const serializedPeople = JSON.stringify(people)
+
+    if (serializedPeople === lastSyncedPeopleJsonRef.current) {
+      return
+    }
+
+    const savePeople = async () => {
+      try {
+        setSyncStatus('Opslaan...')
+
+        await setDoc(
+          listDocRef.current,
+          {
+            people,
+            updatedAt: serverTimestamp(),
+          },
+          { merge: true },
+        )
+        setFirestoreError('')
+      } catch {
+        setSyncStatus('Opslaan mislukt')
+        setFirestoreError('Firestore schrijven mislukt. Controleer je rechten en verbinding.')
+      }
+    }
+
+    void savePeople()
   }, [people])
 
   const updatePersonName = (personId, name) => {
@@ -243,6 +339,16 @@ function App() {
               Voeg personen toe, beheer hun items en bekijk automatisch alle
               totalen.
             </p>
+            <p
+              className={`sync-status ${
+                syncStatus === 'Opslaan...' ? 'sync-status-saving' : ''
+              }`}
+            >
+              {syncStatus}
+            </p>
+            {firestoreError ? (
+              <p className="sync-status sync-status-error">{firestoreError}</p>
+            ) : null}
           </div>
 
           <div className="header-actions">
