@@ -74,7 +74,7 @@ function App() {
   const [people, setPeople] = useState(() => normalizePeople([]))
   const [searchTerm, setSearchTerm] = useState('')
   const [statusFilter, setStatusFilter] = useState('openstaand')
-  const [showOrderSummary, setShowOrderSummary] = useState(false)
+  const [activeTab, setActiveTab] = useState('bestellingen')
   const [printMode, setPrintMode] = useState('list')
   const [syncStatus, setSyncStatus] = useState(
     isFirebaseConfigured ? 'Laden...' : 'Firebase instellen',
@@ -353,6 +353,16 @@ function App() {
       productA.name.localeCompare(productB.name, 'nl-BE', { numeric: true }),
     )
 
+  const summarySizes = Array.from(
+    new Set(
+      summaryProducts.flatMap((product) =>
+        product.sizeEntries.map(([size]) => size),
+      ),
+    ),
+  ).sort((sizeA, sizeB) =>
+    sizeA.localeCompare(sizeB, 'nl-BE', { numeric: true }),
+  )
+
   const filteredPeople = people.filter((person) => {
     const matchesSearch = person.name.toLowerCase().includes(normalizedSearchTerm)
 
@@ -408,149 +418,138 @@ function App() {
           </div>
 
           <div className="header-actions">
-            <button
-              type="button"
-              className="secondary-button"
-              onClick={() => handlePrint('list')}
-            >
-              Bestellijst afdrukken
-            </button>
-            <button type="button" className="primary-button" onClick={addPerson}>
-              Persoon toevoegen
-            </button>
+            {activeTab === 'bestellingen' ? (
+              <>
+                <button
+                  type="button"
+                  className="secondary-button"
+                  onClick={() => handlePrint('list')}
+                >
+                  Bestellijst afdrukken
+                </button>
+                <button
+                  type="button"
+                  className="primary-button"
+                  onClick={addPerson}
+                >
+                  Persoon toevoegen
+                </button>
+              </>
+            ) : (
+              <button
+                type="button"
+                className="secondary-button"
+                onClick={() => handlePrint('summary')}
+              >
+                Overzicht afdrukken
+              </button>
+            )}
           </div>
         </div>
 
-        <div className="summary-card">
-          <div className="summary-stat">
-            <span className="summary-label">Totaal</span>
-            <strong>{formatCurrency(allPeopleTotal)}</strong>
-          </div>
-          <div className="summary-stat">
-            <span className="summary-label">Betaald</span>
-            <strong>{formatCurrency(allPaidTotal)}</strong>
-          </div>
-          <div className="summary-stat">
-            <span className="summary-label">Openstaand</span>
-            <strong>{formatCurrency(allOutstandingTotal)}</strong>
-          </div>
-        </div>
-
-        <div className="status-filter-row">
+        <div className="tabs-row">
           <button
             type="button"
             className={`tab-button ${
-              statusFilter === 'openstaand' ? 'tab-button-active' : ''
+              activeTab === 'bestellingen' ? 'tab-button-active' : ''
             }`}
-            onClick={() => setStatusFilter('openstaand')}
+            onClick={() => setActiveTab('bestellingen')}
           >
-            Openstaand
-          </button>
-          <button
-            type="button"
-            className={`tab-button ${
-              statusFilter === 'afgehaald' ? 'tab-button-active' : ''
-            }`}
-            onClick={() => setStatusFilter('afgehaald')}
-          >
-            Afgehaald
+            Bestellingen
           </button>
           <button
             type="button"
             className={`tab-button ${
-              statusFilter === 'alles' ? 'tab-button-active' : ''
+              activeTab === 'overzicht' ? 'tab-button-active' : ''
             }`}
-            onClick={() => setStatusFilter('alles')}
+            onClick={() => setActiveTab('overzicht')}
           >
-            Alles
+            Overzicht
           </button>
         </div>
 
-        <div className="search-row">
-          <label className="field search-field">
-            <span>Zoeken</span>
-            <input
-              type="text"
-              placeholder="Zoek naam..."
-              value={searchTerm}
-              onChange={(event) => setSearchTerm(event.target.value)}
-            />
-          </label>
-          <button
-            type="button"
-            className="secondary-button summary-toggle-button"
-            onClick={() => setShowOrderSummary((currentValue) => !currentValue)}
-          >
-            {showOrderSummary ? 'Overzicht verbergen' : 'Overzicht maken'}
-          </button>
-        </div>
-
-        {showOrderSummary ? (
-          <section className="order-summary-section">
-            <div className="order-summary-header">
-              <h2>Overzicht per product en maat</h2>
-              <p className="intro">
-                Samenvatting van alle bestelde items, gegroepeerd op product en
-                maat.
-              </p>
+        {activeTab === 'bestellingen' ? (
+          <>
+            <div className="summary-card">
+              <div className="summary-stat">
+                <span className="summary-label">Totaal</span>
+                <strong>{formatCurrency(allPeopleTotal)}</strong>
+              </div>
+              <div className="summary-stat">
+                <span className="summary-label">Betaald</span>
+                <strong>{formatCurrency(allPaidTotal)}</strong>
+              </div>
+              <div className="summary-stat">
+                <span className="summary-label">Openstaand</span>
+                <strong>{formatCurrency(allOutstandingTotal)}</strong>
+              </div>
             </div>
 
-            {summaryProducts.length === 0 ? (
-              <div className="empty-state">Nog geen producten in de bestellijst.</div>
-            ) : (
-              <>
-                <div className="order-summary-actions">
-                  <button
-                    type="button"
-                    className="secondary-button"
-                    onClick={() => handlePrint('summary')}
-                  >
-                    Overzicht afdrukken
-                  </button>
-                </div>
+            <div className="status-filter-row">
+              <button
+                type="button"
+                className={`tab-button ${
+                  statusFilter === 'openstaand' ? 'tab-button-active' : ''
+                }`}
+                onClick={() => setStatusFilter('openstaand')}
+              >
+                Openstaand
+              </button>
+              <button
+                type="button"
+                className={`tab-button ${
+                  statusFilter === 'afgehaald' ? 'tab-button-active' : ''
+                }`}
+                onClick={() => setStatusFilter('afgehaald')}
+              >
+                Afgehaald
+              </button>
+              <button
+                type="button"
+                className={`tab-button ${
+                  statusFilter === 'alles' ? 'tab-button-active' : ''
+                }`}
+                onClick={() => setStatusFilter('alles')}
+              >
+                Alles
+              </button>
+            </div>
 
-                <div className="order-summary-list">
-                  {summaryProducts.map((product) => (
-                    <article key={product.name} className="summary-product-card">
-                      <div className="summary-product-header">
-                        <h3>{product.name}</h3>
-                        <span className="summary-product-total">
-                          Totaal: {product.totalQuantity}x
-                        </span>
-                      </div>
+            <div className="search-row">
+              <label className="field search-field">
+                <span>Zoeken</span>
+                <input
+                  type="text"
+                  placeholder="Zoek naam..."
+                  value={searchTerm}
+                  onChange={(event) => setSearchTerm(event.target.value)}
+                />
+              </label>
+              <button
+                type="button"
+                className="secondary-button summary-toggle-button"
+                onClick={() => setActiveTab('overzicht')}
+              >
+                Overzicht maken
+              </button>
+            </div>
 
-                      <div className="summary-size-list">
-                        {product.sizeEntries.map(([size, quantity]) => (
-                          <div key={`${product.name}-${size}`} className="summary-size-row">
-                            <span>{size}</span>
-                            <strong>{quantity}x</strong>
-                          </div>
-                        ))}
-                      </div>
-                    </article>
-                  ))}
-                </div>
-              </>
-            )}
-          </section>
-        ) : null}
+            <div className="people-list">
+              {filteredPeople.length === 0 ? (
+                <div className="empty-state">Geen resultaten</div>
+              ) : (
+                filteredPeople.map((person, personIndex) => {
+                  const personTotal = getPersonTotal(person)
+                  const paidAmount = getPaidAmount(person)
+                  const outstandingAmount = getOutstandingAmount(person)
 
-        <div className="people-list">
-          {filteredPeople.length === 0 ? (
-            <div className="empty-state">Geen resultaten</div>
-          ) : (
-            filteredPeople.map((person, personIndex) => {
-              const personTotal = getPersonTotal(person)
-              const paidAmount = getPaidAmount(person)
-              const outstandingAmount = getOutstandingAmount(person)
-
-              return (
-                <article
-                  key={person.id}
-                  className={`person-card ${person.pickedUp ? 'is-picked-up' : ''}`}
-                >
-                  <div className="person-header">
-                    <div className="person-index">Persoon {personIndex + 1}</div>
+                  return (
+                    <article
+                      key={person.id}
+                      className={`person-card ${person.pickedUp ? 'is-picked-up' : ''}`}
+                    >
+                      <div className="person-header">
+                        <div className="person-index">Persoon {personIndex + 1}</div>
 
                     <label className="field top-field person-name-field">
                       <span>Naam</span>
@@ -742,12 +741,69 @@ function App() {
                         <strong>{formatCurrency(outstandingAmount)}</strong>
                       </div>
                     </div>
-                  </div>
-                </article>
-              )
-            })
-          )}
-        </div>
+                      </div>
+                    </article>
+                  )
+                })
+              )}
+            </div>
+          </>
+        ) : (
+          <section className="order-summary-section">
+            <div className="order-summary-header">
+              <div>
+                <h2>Overzicht per product en maat</h2>
+                <p className="intro">
+                  Enkel aantallen per product en maat, zonder namen, prijzen of betaalstatus.
+                </p>
+              </div>
+              <div className="order-summary-actions">
+                <button
+                  type="button"
+                  className="secondary-button"
+                  onClick={() => handlePrint('summary')}
+                >
+                  Overzicht afdrukken
+                </button>
+              </div>
+            </div>
+
+            {summaryProducts.length === 0 ? (
+              <div className="empty-state">Nog geen producten in de bestellijst.</div>
+            ) : (
+              <div className="table-wrap order-summary-table-wrap">
+                <table className="items-table order-summary-table">
+                  <thead>
+                    <tr>
+                      <th>Productnaam</th>
+                      {summarySizes.map((size) => (
+                        <th key={`header-${size}`}>{size}</th>
+                      ))}
+                      <th>Totaal</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {summaryProducts.map((product) => {
+                      const sizeMap = Object.fromEntries(product.sizeEntries)
+
+                      return (
+                        <tr key={product.name}>
+                          <td className="summary-product-name-cell">{product.name}</td>
+                          {summarySizes.map((size) => (
+                            <td key={`${product.name}-${size}`}>
+                              {sizeMap[size] ?? 0}
+                            </td>
+                          ))}
+                          <td className="line-total-cell">{product.totalQuantity}</td>
+                        </tr>
+                      )
+                    })}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </section>
+        )}
 
         <section className="print-sheet" aria-hidden="true">
           <div className="print-header">
@@ -819,32 +875,34 @@ function App() {
           {summaryProducts.length === 0 ? (
             <p className="print-empty">Geen producten om af te drukken.</p>
           ) : (
-            <div className="print-summary-list">
-              {summaryProducts.map((product) => (
-                <article key={`summary-print-${product.name}`} className="print-summary-card">
-                  <div className="print-person-row">
-                    <span className="print-label">Product</span>
-                    <strong>{product.name}</strong>
-                  </div>
+            <table className="print-summary-table">
+              <thead>
+                <tr>
+                  <th>Productnaam</th>
+                  {summarySizes.map((size) => (
+                    <th key={`print-header-${size}`}>{size}</th>
+                  ))}
+                  <th>Totaal</th>
+                </tr>
+              </thead>
+              <tbody>
+                {summaryProducts.map((product) => {
+                  const sizeMap = Object.fromEntries(product.sizeEntries)
 
-                  <div className="print-person-row">
-                    <span className="print-label">Maten</span>
-                    <div className="print-order-list">
-                      {product.sizeEntries.map(([size, quantity]) => (
-                        <span key={`print-${product.name}-${size}`}>
-                          {size}: {quantity}x
-                        </span>
+                  return (
+                    <tr key={`summary-print-${product.name}`}>
+                      <td>{product.name}</td>
+                      {summarySizes.map((size) => (
+                        <td key={`print-${product.name}-${size}`}>
+                          {sizeMap[size] ?? 0}
+                        </td>
                       ))}
-                    </div>
-                  </div>
-
-                  <div className="print-person-row">
-                    <span className="print-label">Totaal</span>
-                    <strong>{product.totalQuantity}x</strong>
-                  </div>
-                </article>
-              ))}
-            </div>
+                      <td>{product.totalQuantity}</td>
+                    </tr>
+                  )
+                })}
+              </tbody>
+            </table>
           )}
         </section>
       </section>

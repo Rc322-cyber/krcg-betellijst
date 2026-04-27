@@ -205,6 +205,13 @@
   gap: 20px;
 }
 
+.order-summary-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 16px;
+}
+
 .order-summary-header h2,
 .summary-product-header h3 {
   margin: 0;
@@ -220,6 +227,26 @@
   display: flex;
   justify-content: flex-end;
   margin-bottom: 4px;
+}
+
+.order-summary-table-wrap {
+  padding: 0;
+}
+
+.order-summary-table th,
+.order-summary-table td {
+  text-align: center;
+  white-space: nowrap;
+}
+
+.order-summary-table th:first-child,
+.order-summary-table td:first-child {
+  text-align: left;
+}
+
+.summary-product-name-cell {
+  font-weight: 700;
+  color: #0f172a;
 }
 
 .summary-product-card {
@@ -520,11 +547,6 @@
   gap: 16px;
 }
 
-.print-summary-list {
-  display: grid;
-  gap: 16px;
-}
-
 .print-person-card {
   border: 1px solid #dbe4ee;
   border-radius: 16px;
@@ -532,11 +554,21 @@
   break-inside: avoid;
 }
 
-.print-summary-card {
-  border: 1px solid #dbe4ee;
-  border-radius: 16px;
-  padding: 18px;
-  break-inside: avoid;
+.print-summary-table {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+.print-summary-table th,
+.print-summary-table td {
+  border: 1px solid #cbd5e1;
+  padding: 10px 12px;
+  text-align: center;
+}
+
+.print-summary-table th:first-child,
+.print-summary-table td:first-child {
+  text-align: left;
 }
 
 .print-person-row {
@@ -582,6 +614,7 @@
 
   .page-header,
   .controls-row,
+  .order-summary-header,
   .summary-product-header,
   .person-footer {
     flex-direction: column;
@@ -703,6 +736,7 @@
   }
 
   .page-header,
+  .tabs-row,
   .summary-card,
   .status-filter-row,
   .search-row,
@@ -725,16 +759,19 @@
     font-size: 24px;
   }
 
-  .print-person-card,
-  .print-summary-card {
+  .print-person-card {
     border: 1px solid #cbd5e1;
     border-radius: 0;
     padding: 14px 0;
     page-break-inside: avoid;
   }
 
-  .print-person-card + .print-person-card,
-  .print-summary-card + .print-summary-card {
+  .print-person-card + .print-person-card {
     border-top: 0;
+  }
+
+  .print-summary-table th,
+  .print-summary-table td {
+    padding: 8px 10px;
   }
 }
