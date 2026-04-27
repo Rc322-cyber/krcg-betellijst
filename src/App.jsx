@@ -74,6 +74,8 @@ function App() {
   const [people, setPeople] = useState(() => normalizePeople([]))
   const [searchTerm, setSearchTerm] = useState('')
   const [statusFilter, setStatusFilter] = useState('openstaand')
+  const [showOrderSummary, setShowOrderSummary] = useState(false)
+  const [printMode, setPrintMode] = useState('list')
   const [syncStatus, setSyncStatus] = useState(
     isFirebaseConfigured ? 'Laden...' : 'Firebase instellen',
   )
@@ -194,6 +196,18 @@ function App() {
     void savePeople()
   }, [people])
 
+  useEffect(() => {
+    const handleAfterPrint = () => {
+      setPrintMode('list')
+    }
+
+    window.addEventListener('afterprint', handleAfterPrint)
+
+    return () => {
+      window.removeEventListener('afterprint', handleAfterPrint)
+    }
+  }, [])
+
   const updatePersonName = (personId, name) => {
     applyPeopleUpdate((currentPeople) =>
       currentPeople.map((person) =>
@@ -303,6 +317,42 @@ function App() {
 
   const normalizedSearchTerm = searchTerm.trim().toLowerCase()
 
+  const orderSummary = people.reduce((summary, person) => {
+    person.items.forEach((item) => {
+      const productName = item.name.trim()
+      const quantity = parseNumber(item.quantity)
+
+      if (!productName || quantity <= 0) {
+        return
+      }
+
+      const size = item.size.trim() || 'Geen maat'
+      const existingProduct = summary[productName] ?? {
+        name: productName,
+        totalQuantity: 0,
+        sizes: {},
+      }
+      const currentSizeTotal = existingProduct.sizes[size] ?? 0
+
+      existingProduct.totalQuantity += quantity
+      existingProduct.sizes[size] = currentSizeTotal + quantity
+      summary[productName] = existingProduct
+    })
+
+    return summary
+  }, {})
+
+  const summaryProducts = Object.values(orderSummary)
+    .map((product) => ({
+      ...product,
+      sizeEntries: Object.entries(product.sizes).sort(([sizeA], [sizeB]) =>
+        sizeA.localeCompare(sizeB, 'nl-BE', { numeric: true }),
+      ),
+    }))
+    .sort((productA, productB) =>
+      productA.name.localeCompare(productB.name, 'nl-BE', { numeric: true }),
+    )
+
   const filteredPeople = people.filter((person) => {
     const matchesSearch = person.name.toLowerCase().includes(normalizedSearchTerm)
 
@@ -321,15 +371,21 @@ function App() {
     return true
   })
 
-  const handlePrint = () => {
-    window.print()
+  const handlePrint = (nextPrintMode) => {
+    setPrintMode(nextPrintMode)
+
+    requestAnimationFrame(() => {
+      requestAnimationFrame(() => {
+        window.print()
+      })
+    })
   }
 
   const statusFilterLabel =
     statusFilter.charAt(0).toUpperCase() + statusFilter.slice(1)
 
   return (
-    <main className="app-shell">
+    <main className={`app-shell print-mode-${printMode}`}>
       <section className="page-card">
         <div className="page-header">
           <div>
@@ -355,7 +411,7 @@ function App() {
             <button
               type="button"
               className="secondary-button"
-              onClick={handlePrint}
+              onClick={() => handlePrint('list')}
             >
               Bestellijst afdrukken
             </button>
@@ -420,7 +476,64 @@ function App() {
               onChange={(event) => setSearchTerm(event.target.value)}
             />
           </label>
+          <button
+            type="button"
+            className="secondary-button summary-toggle-button"
+            onClick={() => setShowOrderSummary((currentValue) => !currentValue)}
+          >
+            {showOrderSummary ? 'Overzicht verbergen' : 'Overzicht maken'}
+          </button>
         </div>
+
+        {showOrderSummary ? (
+          <section className="order-summary-section">
+            <div className="order-summary-header">
+              <h2>Overzicht per product en maat</h2>
+              <p className="intro">
+                Samenvatting van alle bestelde items, gegroepeerd op product en
+                maat.
+              </p>
+            </div>
+
+            {summaryProducts.length === 0 ? (
+              <div className="empty-state">Nog geen producten in de bestellijst.</div>
+            ) : (
+              <>
+                <div className="order-summary-actions">
+                  <button
+                    type="button"
+                    className="secondary-button"
+                    onClick={() => handlePrint('summary')}
+                  >
+                    Overzicht afdrukken
+                  </button>
+                </div>
+
+                <div className="order-summary-list">
+                  {summaryProducts.map((product) => (
+                    <article key={product.name} className="summary-product-card">
+                      <div className="summary-product-header">
+                        <h3>{product.name}</h3>
+                        <span className="summary-product-total">
+                          Totaal: {product.totalQuantity}x
+                        </span>
+                      </div>
+
+                      <div className="summary-size-list">
+                        {product.sizeEntries.map(([size, quantity]) => (
+                          <div key={`${product.name}-${size}`} className="summary-size-row">
+                            <span>{size}</span>
+                            <strong>{quantity}x</strong>
+                          </div>
+                        ))}
+                      </div>
+                    </article>
+                  ))}
+                </div>
+              </>
+            )}
+          </section>
+        ) : null}
 
         <div className="people-list">
           {filteredPeople.length === 0 ? (
@@ -693,6 +806,44 @@ function App() {
                   </article>
                 )
               })}
+            </div>
+          )}
+        </section>
+
+        <section className="print-summary-sheet" aria-hidden="true">
+          <div className="print-header">
+            <h1>Productoverzicht</h1>
+            <p>Samenvatting van alle producten per maat</p>
+          </div>
+
+          {summaryProducts.length === 0 ? (
+            <p className="print-empty">Geen producten om af te drukken.</p>
+          ) : (
+            <div className="print-summary-list">
+              {summaryProducts.map((product) => (
+                <article key={`summary-print-${product.name}`} className="print-summary-card">
+                  <div className="print-person-row">
+                    <span className="print-label">Product</span>
+                    <strong>{product.name}</strong>
+                  </div>
+
+                  <div className="print-person-row">
+                    <span className="print-label">Maten</span>
+                    <div className="print-order-list">
+                      {product.sizeEntries.map(([size, quantity]) => (
+                        <span key={`print-${product.name}-${size}`}>
+                          {size}: {quantity}x
+                        </span>
+                      ))}
+                    </div>
+                  </div>
+
+                  <div className="print-person-row">
+                    <span className="print-label">Totaal</span>
+                    <strong>{product.totalQuantity}x</strong>
+                  </div>
+                </article>
+              ))}
             </div>
           )}
         </section>

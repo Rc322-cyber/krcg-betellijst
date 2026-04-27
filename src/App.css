@@ -175,6 +175,10 @@
   max-width: 420px;
 }
 
+.summary-toggle-button {
+  white-space: nowrap;
+}
+
 .pickup-hint {
   margin: 0;
   color: #475569;
@@ -210,6 +214,12 @@
 .order-summary-list {
   display: grid;
   gap: 18px;
+}
+
+.order-summary-actions {
+  display: flex;
+  justify-content: flex-end;
+  margin-bottom: 4px;
 }
 
 .summary-product-card {
@@ -492,6 +502,10 @@
   display: none;
 }
 
+.print-summary-sheet {
+  display: none;
+}
+
 .print-header {
   margin-bottom: 24px;
 }
@@ -506,7 +520,19 @@
   gap: 16px;
 }
 
+.print-summary-list {
+  display: grid;
+  gap: 16px;
+}
+
 .print-person-card {
+  border: 1px solid #dbe4ee;
+  border-radius: 16px;
+  padding: 18px;
+  break-inside: avoid;
+}
+
+.print-summary-card {
   border: 1px solid #dbe4ee;
   border-radius: 16px;
   padding: 18px;
@@ -573,6 +599,10 @@
     align-items: stretch;
   }
 
+  .order-summary-actions {
+    justify-content: stretch;
+  }
+
   .person-header {
     grid-template-columns: 1fr 1fr;
   }
@@ -620,7 +650,8 @@
   .mode-button,
   .tab-button,
   .header-actions .primary-button,
-  .header-actions .secondary-button {
+  .header-actions .secondary-button,
+  .order-summary-actions .secondary-button {
     width: 100%;
     justify-content: center;
   }
@@ -679,8 +710,14 @@
     display: none !important;
   }
 
-  .print-sheet {
+  .print-sheet,
+  .print-summary-sheet {
     display: block;
+  }
+
+  .print-mode-list .print-summary-sheet,
+  .print-mode-summary .print-sheet {
+    display: none;
   }
 
   .print-header h1 {
@@ -688,14 +725,16 @@
     font-size: 24px;
   }
 
-  .print-person-card {
+  .print-person-card,
+  .print-summary-card {
     border: 1px solid #cbd5e1;
     border-radius: 0;
     padding: 14px 0;
     page-break-inside: avoid;
   }
 
-  .print-person-card + .print-person-card {
+  .print-person-card + .print-person-card,
+  .print-summary-card + .print-summary-card {
     border-top: 0;
   }
 }
