@@ -554,6 +554,12 @@
   break-inside: avoid;
 }
 
+.print-person-name {
+  margin: 0 0 12px;
+  font-size: 1.2rem;
+  line-height: 1.2;
+}
+
 .print-summary-table {
   width: 100%;
   border-collapse: collapse;
@@ -589,17 +595,10 @@
 }
 
 .print-order-list {
+  margin: 0;
+  padding-left: 20px;
   display: grid;
   gap: 6px;
-  text-align: right;
-}
-
-.print-totals-grid {
-  display: grid;
-  gap: 10px;
-  margin-top: 18px;
-  padding-top: 16px;
-  border-top: 1px solid #e2e8f0;
 }
 
 .print-empty {
@@ -705,7 +704,7 @@
   }
 
   .print-order-list {
-    text-align: left;
+    padding-left: 18px;
   }
 }
 

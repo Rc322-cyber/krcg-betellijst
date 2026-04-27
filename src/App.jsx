@@ -297,7 +297,7 @@ function App() {
         const quantity = parseNumber(item.quantity)
         const size = item.size.trim()
 
-        return `${quantity}x ${item.name.trim()}${size ? ` (${size})` : ''} - ${formatCurrency(getItemTotal(item))}`
+        return `${quantity}x ${item.name.trim()}${size ? ` maat ${size}` : ''}`
       })
 
   const allPeopleTotal = people.reduce(
@@ -380,6 +380,13 @@ function App() {
 
     return true
   })
+
+  const printablePeople = filteredPeople
+    .map((person) => ({
+      ...person,
+      printableItems: summarizeItems(person.items),
+    }))
+    .filter((person) => person.printableItems.length > 0)
 
   const handlePrint = (nextPrintMode) => {
     setPrintMode(nextPrintMode)
@@ -811,54 +818,22 @@ function App() {
             <p>Filter: {statusFilterLabel}</p>
           </div>
 
-          {filteredPeople.length === 0 ? (
+          {printablePeople.length === 0 ? (
             <p className="print-empty">Geen personen om af te drukken.</p>
           ) : (
             <div className="print-list">
-              {filteredPeople.map((person) => {
-                const personTotal = getPersonTotal(person)
-                const paidAmount = getPaidAmount(person)
-                const outstandingAmount = getOutstandingAmount(person)
-                const itemSummary = summarizeItems(person.items)
-
+              {printablePeople.map((person) => {
                 return (
                   <article key={`print-${person.id}`} className="print-person-card">
-                    <div className="print-person-row">
-                      <span className="print-label">Naam</span>
-                      <strong>{person.name.trim() || 'Onbekend'}</strong>
-                    </div>
+                    <h2 className="print-person-name">
+                      {person.name.trim() || 'Onbekend'}
+                    </h2>
 
-                    <div className="print-person-row">
-                      <span className="print-label">Bestelling</span>
-                      <div className="print-order-list">
-                        {itemSummary.length === 0 ? (
-                          <span>Geen bestelling</span>
-                        ) : (
-                          itemSummary.map((summaryLine, index) => (
-                            <span key={`${person.id}-${index}`}>{summaryLine}</span>
-                          ))
-                        )}
-                      </div>
-                    </div>
-
-                    <div className="print-totals-grid">
-                      <div className="print-person-row">
-                        <span className="print-label">Totaal te betalen</span>
-                        <strong>{formatCurrency(personTotal)}</strong>
-                      </div>
-                      <div className="print-person-row">
-                        <span className="print-label">Betaald bedrag</span>
-                        <strong>{formatCurrency(paidAmount)}</strong>
-                      </div>
-                      <div className="print-person-row">
-                        <span className="print-label">Openstaand bedrag</span>
-                        <strong>{formatCurrency(outstandingAmount)}</strong>
-                      </div>
-                      <div className="print-person-row">
-                        <span className="print-label">Status afgehaald</span>
-                        <strong>{person.pickedUp ? 'Ja' : 'Nee'}</strong>
-                      </div>
-                    </div>
+                    <ul className="print-order-list">
+                      {person.printableItems.map((summaryLine, index) => (
+                        <li key={`${person.id}-${index}`}>{summaryLine}</li>
+                      ))}
+                    </ul>
                   </article>
                 )
               })}
