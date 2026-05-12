@@ -87,6 +87,12 @@ const appendOrderToBestellijst = async ({ db, serverTimestamp, order, telegram }
   const listRef = db.collection(COLLECTION_NAME).doc(DOCUMENT_NAME)
   const person = createTelegramPerson({ ...order, telegram })
 
+  console.log('telegramWebhook Firestore schrijfactie gestart', {
+    collection: COLLECTION_NAME,
+    document: DOCUMENT_NAME,
+    person,
+  })
+
   await db.runTransaction(async (transaction) => {
     const snapshot = await transaction.get(listRef)
     const currentPeople = Array.isArray(snapshot.data()?.people)
@@ -103,6 +109,12 @@ const appendOrderToBestellijst = async ({ db, serverTimestamp, order, telegram }
     )
   })
 
+  console.log('telegramWebhook Firestore schrijfactie gelukt', {
+    collection: COLLECTION_NAME,
+    document: DOCUMENT_NAME,
+    personId: person.id,
+  })
+
   return person
 }
 
@@ -117,9 +129,13 @@ export const handleTelegramWebhook = async ({
     return
   }
 
+  console.log('telegramWebhook volledige update body', request.body)
+
   const message = request.body?.message
   const text = message?.text
   const chatId = message?.chat?.id
+
+  console.log('telegramWebhook ontvangen text', text || '')
 
   if (!text) {
     response.status(200).json({ ok: true, skipped: 'No text message' })
@@ -128,24 +144,32 @@ export const handleTelegramWebhook = async ({
 
   const order = parseTelegramOrder(text)
 
+  console.log('telegramWebhook parsing resultaat', order)
+
   if (!order) {
     await sendTelegramMessage({ chatId, text: getHelpMessage() })
     response.status(200).json({ ok: true, skipped: 'Invalid order format' })
     return
   }
 
-  await appendOrderToBestellijst({
-    db,
-    serverTimestamp,
-    order,
-    telegram: {
-      chatId,
-      messageId: message.message_id,
-      username: message.from?.username || '',
-      firstName: message.from?.first_name || '',
-      receivedAt: new Date().toISOString(),
-    },
-  })
+  try {
+    await appendOrderToBestellijst({
+      db,
+      serverTimestamp,
+      order,
+      telegram: {
+        chatId,
+        messageId: message.message_id,
+        username: message.from?.username || '',
+        firstName: message.from?.first_name || '',
+        receivedAt: new Date().toISOString(),
+      },
+    })
+  } catch (error) {
+    console.error('telegramWebhook Firestore fout', error)
+    response.status(500).json({ ok: false, error: 'Firestore write failed' })
+    return
+  }
 
   await sendTelegramMessage({
     chatId,
