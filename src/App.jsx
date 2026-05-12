@@ -101,7 +101,6 @@ function App() {
 
   useEffect(() => {
     if (!isFirebaseConfigured || !listDocRef.current) {
-      setSyncStatus('Firebase instellen')
       return undefined
     }
 

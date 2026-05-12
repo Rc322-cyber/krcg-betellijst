@@ -1,5 +1,47 @@
 # React + Vite
 
+## Telegram bot MVP
+
+Deze repo bevat een Firebase Cloud Function webhook voor eenvoudige Telegram bestellingen.
+
+Verwacht berichtformaat:
+
+```text
+Naam: Raf
+Product: Trui GCF
+Maat: L
+Aantal: 1
+```
+
+De webhook schrijft naar hetzelfde Firestore document als de app: `krcg/bestellijst`.
+
+Benodigde npm packages voor de Cloud Function:
+
+```bash
+cd functions
+npm install firebase-admin firebase-functions
+```
+
+Telegram bot token:
+
+- Zet `TELEGRAM_BOT_TOKEN` als Firebase secret/env var.
+- Hardcode de token niet in de repository.
+- De comments in `functions/telegramWebhook.js` tonen waar de token gelezen wordt.
+
+Deploy:
+
+```bash
+firebase deploy --only functions:telegramWebhook
+```
+
+Webhook koppelen aan Telegram na deploy:
+
+```bash
+curl "https://api.telegram.org/bot<TELEGRAM_BOT_TOKEN>/setWebhook?url=<FUNCTION_URL>"
+```
+
+`<FUNCTION_URL>` is de URL die Firebase toont na deploy van `telegramWebhook`.
+
 This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
 
 Currently, two official plugins are available:
