@@ -1,5 +1,6 @@
 const COLLECTION_NAME = 'krcg'
 const DOCUMENT_NAME = 'bestellijst'
+const SESSION_COLLECTION_NAME = 'telegramSessions'
 
 const PRODUCTS = [
   { id: 'trui_gcf', name: 'Trui GCF' },
@@ -134,12 +135,6 @@ const parseCallbackData = (data = '') => {
   }
 }
 
-const getTelegramUserName = (user = {}) => {
-  const fullName = [user.first_name, user.last_name].filter(Boolean).join(' ')
-
-  return fullName || user.username || `Telegram gebruiker ${user.id || ''}`.trim()
-}
-
 const callTelegramApi = async (method, payload) => {
   // Vul TELEGRAM_BOT_TOKEN in als Firebase secret/env var, niet hardcoded in git.
   // Voorbeeld lokaal/functions env: TELEGRAM_BOT_TOKEN=123456:ABC...
@@ -190,6 +185,41 @@ const clearTelegramInlineKeyboard = async ({ chatId, messageId }) => {
   })
 }
 
+const getSessionRef = (db, chatId) =>
+  db.collection(SESSION_COLLECTION_NAME).doc(String(chatId))
+
+const getTelegramSession = async ({ db, chatId }) => {
+  if (!chatId) {
+    return null
+  }
+
+  const snapshot = await getSessionRef(db, chatId).get()
+
+  return snapshot.exists ? snapshot.data() : null
+}
+
+const saveTelegramSession = async ({ db, serverTimestamp, chatId, session }) => {
+  if (!chatId) {
+    return
+  }
+
+  await getSessionRef(db, chatId).set(
+    {
+      ...session,
+      updatedAt: serverTimestamp(),
+    },
+    { merge: true },
+  )
+}
+
+const clearTelegramSession = async ({ db, chatId }) => {
+  if (!chatId) {
+    return
+  }
+
+  await getSessionRef(db, chatId).delete()
+}
+
 const appendOrderToBestellijst = async ({ db, serverTimestamp, order, telegram }) => {
   const listRef = db.collection(COLLECTION_NAME).doc(DOCUMENT_NAME)
   const person = createTelegramPerson({ ...order, telegram })
@@ -232,13 +262,15 @@ const handleTelegramCallback = async ({
 }) => {
   const chatId = callbackQuery.message?.chat?.id
   const callback = parseCallbackData(callbackQuery.data)
-  const product = getProductById(callback?.productId)
+  const session = await getTelegramSession({ db, chatId })
+  const productId = callback?.productId || session?.productId
+  const product = getProductById(productId)
 
   console.log('telegramWebhook callback parsing resultaat', callback)
 
   await answerTelegramCallback(callbackQuery.id)
 
-  if (!callback || !product || !chatId) {
+  if (!callback || !chatId) {
     await sendTelegramMessage({
       chatId,
       text: 'Er ging iets mis. Start opnieuw met /start.',
@@ -246,7 +278,36 @@ const handleTelegramCallback = async ({
     return { ok: true, skipped: 'Invalid callback data' }
   }
 
-  if (callback.step === 'product') {
+  if (callback.step === 'product' && !session?.name) {
+    await saveTelegramSession({
+      db,
+      serverTimestamp,
+      chatId,
+      session: { step: 'name' },
+    })
+    await sendTelegramMessage({
+      chatId,
+      text: 'Geef je naam in:',
+    })
+    return { ok: true, skipped: 'Missing session name' }
+  }
+
+  if (callback.step === 'product' && product) {
+    console.log('telegramWebhook product gekozen', {
+      chatId,
+      product: product.name,
+    })
+    await saveTelegramSession({
+      db,
+      serverTimestamp,
+      chatId,
+      session: {
+        step: 'size',
+        name: session?.name || '',
+        productId: product.id,
+        product: product.name,
+      },
+    })
     await sendTelegramMessage({
       chatId,
       text: 'Kies een maat.',
@@ -255,7 +316,24 @@ const handleTelegramCallback = async ({
     return { ok: true }
   }
 
-  if (callback.step === 'size' && SIZES.includes(callback.size)) {
+  if (callback.step === 'size' && product && SIZES.includes(callback.size)) {
+    console.log('telegramWebhook maat gekozen', {
+      chatId,
+      product: product.name,
+      size: callback.size,
+    })
+    await saveTelegramSession({
+      db,
+      serverTimestamp,
+      chatId,
+      session: {
+        step: 'quantity',
+        name: session?.name || '',
+        productId: product.id,
+        product: product.name,
+        size: callback.size,
+      },
+    })
     await sendTelegramMessage({
       chatId,
       text: 'Kies een aantal.',
@@ -266,12 +344,41 @@ const handleTelegramCallback = async ({
 
   if (
     callback.step === 'quantity' &&
+    product &&
     SIZES.includes(callback.size) &&
     QUANTITIES.includes(callback.quantity)
   ) {
+    const orderPreview = {
+      name: session?.name || '',
+      product: product.name,
+      size: callback.size,
+      quantity: callback.quantity,
+    }
+
+    console.log('telegramWebhook aantal gekozen', {
+      chatId,
+      quantity: callback.quantity,
+      order: orderPreview,
+    })
+    await saveTelegramSession({
+      db,
+      serverTimestamp,
+      chatId,
+      session: {
+        step: 'confirm',
+        ...orderPreview,
+        productId: product.id,
+      },
+    })
     await sendTelegramMessage({
       chatId,
-      text: 'Bevestig bestelling',
+      text: [
+        `Naam: ${orderPreview.name}`,
+        `Product: ${orderPreview.product}`,
+        `Maat: ${orderPreview.size}`,
+        `Aantal: ${orderPreview.quantity}`,
+        'Bevestigen?',
+      ].join('\n'),
       replyMarkup: getConfirmKeyboard(product.id, callback.size, callback.quantity),
     })
     return { ok: true }
@@ -279,18 +386,31 @@ const handleTelegramCallback = async ({
 
   if (
     callback.step === 'confirm' &&
+    product &&
     SIZES.includes(callback.size) &&
     QUANTITIES.includes(callback.quantity)
   ) {
     const messageId = callbackQuery.message?.message_id
     const order = {
-      name: getTelegramUserName(callbackQuery.from),
+      name: session?.name || '',
       product: product.name,
       size: callback.size,
       quantity: callback.quantity,
     }
 
+    console.log('telegramWebhook bevestigen gekozen', {
+      chatId,
+      order,
+    })
     console.log('telegramWebhook parsing resultaat', order)
+
+    if (!order.name) {
+      await sendTelegramMessage({
+        chatId,
+        text: 'Er ontbreekt een naam. Start opnieuw met /start.',
+      })
+      return { ok: true, skipped: 'Missing session name' }
+    }
 
     try {
       await appendOrderToBestellijst({
@@ -313,9 +433,10 @@ const handleTelegramCallback = async ({
 
     await sendTelegramMessage({
       chatId,
-      text: 'Bestelling opgeslagen ✅',
+      text: 'Bestelling opgeslagen \u2705',
     })
     await clearTelegramInlineKeyboard({ chatId, messageId })
+    await clearTelegramSession({ db, chatId })
     return { ok: true }
   }
 
@@ -368,9 +489,49 @@ export const handleTelegramWebhook = async ({
   }
 
   if (text.trim().startsWith('/start')) {
+    console.log('telegramWebhook start ontvangen', { chatId })
+    await saveTelegramSession({
+      db,
+      serverTimestamp,
+      chatId,
+      session: { step: 'name' },
+    })
     await sendTelegramMessage({
       chatId,
-      text: 'Welkom bij Casual Bestellingen. Kies een product.',
+      text: 'Geef je naam in:',
+    })
+    response.status(200).json({ ok: true })
+    return
+  }
+
+  const session = await getTelegramSession({ db, chatId })
+
+  if (session?.step === 'name') {
+    const name = text.trim()
+
+    console.log('telegramWebhook naam ontvangen', { chatId, name })
+
+    if (!name) {
+      await sendTelegramMessage({
+        chatId,
+        text: 'Geef je naam in:',
+      })
+      response.status(200).json({ ok: true, skipped: 'Empty name' })
+      return
+    }
+
+    await saveTelegramSession({
+      db,
+      serverTimestamp,
+      chatId,
+      session: {
+        step: 'product',
+        name,
+      },
+    })
+    await sendTelegramMessage({
+      chatId,
+      text: 'Kies een product.',
       replyMarkup: getProductKeyboard(),
     })
     response.status(200).json({ ok: true })
