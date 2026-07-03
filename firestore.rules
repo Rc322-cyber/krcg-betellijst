@@ -1,0 +1,89 @@
+rules_version = '2';
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+    function isAdmin() {
+      return request.auth != null
+        && (
+          request.auth.token.email in ['rafke89@gmail.com']
+          || (
+            exists(/databases/$(database)/documents/admins/$(request.auth.token.email))
+            && get(/databases/$(database)/documents/admins/$(request.auth.token.email)).data.active != false
+          )
+        );
+    }
+
+    function isValidProduct() {
+      return request.resource.data.keys().hasOnly([
+          'name',
+          'price',
+          'colors',
+          'sizes',
+          'active',
+          'imageUrl',
+          'description',
+          'category',
+          'createdAt',
+          'updatedAt'
+        ])
+        && request.resource.data.name is string
+        && request.resource.data.name.size() > 0
+        && request.resource.data.price is string
+        && request.resource.data.colors is list
+        && request.resource.data.sizes is list
+        && request.resource.data.active is bool
+        && request.resource.data.imageUrl is string
+        && request.resource.data.description is string
+        && request.resource.data.category is string;
+    }
+
+    function isPublicOrderCreate() {
+      return request.resource.data.keys().hasOnly([
+          'name',
+          'paymentStatus',
+          'paymentMethod',
+          'paidAmount',
+          'pickedUp',
+          'items',
+          'source',
+          'datum',
+          'createdAt',
+          'updatedAt'
+        ])
+        && request.resource.data.name is string
+        && request.resource.data.name.size() > 0
+        && request.resource.data.paymentStatus == 'Niet betaald'
+        && request.resource.data.paymentMethod in ['Payconiq', 'Overschrijving', 'Cash']
+        && request.resource.data.paidAmount == ''
+        && request.resource.data.pickedUp == false
+        && request.resource.data.source == 'public'
+        && request.resource.data.items is list
+        && request.resource.data.items.size() > 0;
+    }
+
+    match /admins/{adminEmail} {
+      allow read: if isAdmin() || (request.auth != null && request.auth.token.email == adminEmail);
+      allow create, update, delete: if isAdmin();
+    }
+
+    match /products/{productId} {
+      allow read: if isAdmin() || resource.data.active == true;
+      allow create, update: if isAdmin() && isValidProduct();
+      allow delete: if isAdmin();
+    }
+
+    match /orders/{orderId} {
+      allow create: if isAdmin() || isPublicOrderCreate();
+      allow read, update, delete: if isAdmin();
+    }
+
+    match /settings/{settingId} {
+      allow read, write: if isAdmin();
+    }
+
+    match /krcg/{documentId} {
+      allow read: if isAdmin();
+      allow write: if false;
+    }
+  }
+}
